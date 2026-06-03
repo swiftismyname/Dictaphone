@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14110f">
+<title>Dictaphone — Voice Notes to Action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14110f;--surface:#1d1916;--surface-2:#262019;--ink:#f3ece2;--muted:#9a9088;
+    --faint:#6a625b;--gold:#e3a84e;--gold-dim:#b4842f;--rec:#e0533d;
+    --line:rgba(243,236,226,.08);--line-strong:rgba(243,236,226,.14);
+    --hi:#7fb685;--med:#e3a84e;--lo:#7a93b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--ink)}
+  body{font-family:"Hanken Grotesk",sans-serif;min-height:100vh;line-height:1.5;overflow-x:hidden;
+    background:radial-gradient(120% 80% at 50% -10%, rgba(227,168,78,.10), transparent 60%),var(--bg);}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .wrap{position:relative;z-index:1;max-width:540px;margin:0 auto;padding:28px 20px 64px}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
+  .brand{font-family:"Fraunces",serif;font-weight:500;font-size:26px;letter-spacing:-.01em}
+  .brand .dot{color:var(--gold)}
+  .tag{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+  .stage{display:flex;flex-direction:column;align-items:center;padding:18px 0 8px}
+  .mic-wrap{position:relative;width:148px;height:148px;display:flex;align-items:center;justify-content:center}
+  .ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--line-strong);pointer-events:none}
+  .pulse{position:absolute;inset:0;border-radius:50%;border:2px solid var(--rec);opacity:0;pointer-events:none}
+  .recording .pulse{animation:pulse 1.8s ease-out infinite}
+  .recording .pulse.b{animation-delay:.9s}
+  @keyframes pulse{0%{transform:scale(.82);opacity:.55}100%{transform:scale(1.35);opacity:0}}
+  .mic{width:108px;height:108px;border-radius:50%;border:none;cursor:pointer;position:relative;z-index:2;
+    background:linear-gradient(160deg,var(--surface-2),var(--surface));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 14px 34px rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;color:var(--ink);transition:transform .15s,box-shadow .2s;}
+  .mic:active{transform:scale(.95)}
+  .recording .mic{background:linear-gradient(160deg,#3a1f1a,#2a1612);color:var(--rec);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(224,83,61,.4),0 16px 40px rgba(224,83,61,.25)}
+  .mic svg{width:40px;height:40px}
+  .timer{font-family:"JetBrains Mono",monospace;font-size:15px;letter-spacing:.08em;color:var(--muted);margin-top:18px;min-height:20px}
+  .recording .timer{color:var(--rec)}
+  .hint{font-size:13.5px;color:var(--faint);margin-top:4px;text-align:center}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:22px}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .panel-head h2{font-family:"Fraunces",serif;font-weight:500;font-size:17px;letter-spacing:-.01em}
+  .panel-head .meta{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  textarea#transcript{width:100%;min-height:120px;resize:vertical;background:var(--bg);color:var(--ink);
+    border:1px solid var(--line);border-radius:12px;padding:14px;font-family:"JetBrains Mono",monospace;font-size:13.5px;line-height:1.65;}
+  textarea#transcript:focus{outline:none;border-color:var(--gold-dim)}
+  textarea#transcript::placeholder{color:var(--faint)}
+  .row{display:flex;gap:10px;margin-top:14px}
+  .btn{flex:1;border:none;cursor:pointer;border-radius:12px;padding:14px;font-family:"Hanken Grotesk",sans-serif;font-weight:600;font-size:14.5px;transition:filter .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--gold);color:#1a1206}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line-strong);flex:0 0 auto;width:52px;padding:14px 0}
+  .btn-ghost:hover{color:var(--ink);border-color:var(--gold-dim)}
+  #results{margin-top:22px}
+  .result-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .rc-top{padding:18px 18px 6px}
+  .rc-title{font-family:"Fraunces",serif;font-weight:600;font-size:22px;line-height:1.2;letter-spacing:-.015em}
+  .rc-when{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:6px}
+  .section{padding:16px 18px;border-top:1px solid var(--line)}
+  .section-label{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px}
+  .summary{font-size:15px;line-height:1.6;color:var(--ink)}
+  ul.points{list-style:none}
+  ul.points li{position:relative;padding-left:18px;font-size:14.5px;color:var(--ink);margin-bottom:8px;line-height:1.5}
+  ul.points li::before{content:"";position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+  .step{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .chk{flex:0 0 auto;width:21px;height:21px;border-radius:7px;border:1.5px solid var(--line-strong);background:var(--bg);cursor:pointer;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .chk svg{width:12px;height:12px;opacity:0;transition:.15s;color:#1a1206}
+  .step.done .chk{background:var(--gold);border-color:var(--gold)}
+  .step.done .chk svg{opacity:1}
+  .step-body{flex:1;min-width:0}
+  .step-text{font-size:14.5px;line-height:1.45}
+  .step.done .step-text{color:var(--faint);text-decoration:line-through}
+  .step-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px}
+  .chip{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.06em;padding:3px 7px;border-radius:6px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+  .chip.pri{text-transform:uppercase;letter-spacing:.12em}
+  .chip.high{color:var(--hi);border-color:rgba(127,182,133,.3)}
+  .chip.medium{color:var(--med);border-color:rgba(227,168,78,.3)}
+  .chip.low{color:var(--lo);border-color:rgba(122,147,184,.3)}
+  .rc-actions{display:flex;gap:10px;padding:16px 18px;border-top:1px solid var(--line);background:var(--surface-2)}
+  .rc-actions .btn{font-size:13.5px;padding:11px}
+  .rc-actions .btn-ghost{flex:1;width:auto}
+  .hist{margin-top:30px}
+  .hist-label{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;padding-left:2px}
+  .hist-item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--surface);border:1px solid var(--line);border-radius:13px;margin-bottom:9px;cursor:pointer;transition:.15s}
+  .hist-item:hover{border-color:var(--gold-dim)}
+  .hist-item .hi-title{flex:1;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-item .hi-when{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--faint);letter-spacing:.08em}
+  .banner{background:rgba(224,83,61,.1);border:1px solid rgba(224,83,61,.3);color:#f0a99d;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;margin-top:16px}
+  .banner.warn{background:rgba(227,168,78,.08);border-color:rgba(227,168,78,.25);color:#e8c186}
+  .loading{display:flex;align-items:center;justify-content:center;gap:11px;padding:30px;color:var(--muted);font-size:14px}
+  .spinner{width:18px;height:18px;border:2px solid var(--line-strong);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:600;opacity:0;transition:.25s;z-index:50;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hidden{display:none!important}
+  footer{text-align:center;margin-top:40px;font-size:11.5px;color:var(--faint);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Dictaphone<span class="dot">.</span></div>
+    <div class="tag">voice → action</div>
+  </header>
+  <div class="stage" id="stage">
+    <div class="mic-wrap" id="micWrap">
+      <div class="ring"></div><div class="pulse a"></div><div class="pulse b"></div>
+      <button class="mic" id="micBtn" aria-label="Record">
+        <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+    </div>
+    <div class="timer" id="timer">Tap to record</div>
+    <div class="hint" id="hint">Speak naturally — your words appear below in real time.</div>
+  </div>
+  <div id="supportBanner"></div>
+  <div class="panel">
+    <div class="panel-head"><h2>Transcript</h2><span class="meta" id="wordCount">0 words</span></div>
+    <textarea id="transcript" placeholder="Your transcription appears here. You can also type or paste text — then hit Analyze."></textarea>
+    <div class="row">
+      <button class="btn btn-primary" id="analyzeBtn" disabled>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+        Analyze
+      </button>
+      <button class="btn btn-ghost" id="clearBtn" aria-label="Clear" title="Clear">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="results"></div>
+  <div class="hist hidden" id="histWrap"><div class="hist-label">Session history</div><div id="histList"></div></div>
+  <footer>Transcription runs in your browser. Summaries go through your Netlify function to Claude.<br>Notes are held in memory only and clear when you reload.</footer>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  "use strict";
+  var recognition=null, recording=false, finalText="", interimText="";
+  var startTime=0, timerInt=null;
+  var history=[];
+
+  var micBtn=document.getElementById('micBtn'), micWrap=document.getElementById('micWrap'),
+      stage=document.getElementById('stage'), timerEl=document.getElementById('timer'),
+      hintEl=document.getElementById('hint'), ta=document.getElementById('transcript'),
+      wordCountEl=document.getElementById('wordCount'), analyzeBtn=document.getElementById('analyzeBtn'),
+      clearBtn=document.getElementById('clearBtn'), resultsEl=document.getElementById('results'),
+      supportBanner=document.getElementById('supportBanner'), histWrap=document.getElementById('histWrap'),
+      histList=document.getElementById('histList'), toastEl=document.getElementById('toast');
+
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition, speechOK=!!SR;
+  if(!speechOK){
+    supportBanner.innerHTML='<div class="banner warn">This browser doesn\'t support in-browser speech recognition (common on iOS in-app browsers). You can still type or paste a transcript and use Analyze. For live recording, use Chrome on Android/desktop or Safari on iOS.</div>';
+    timerEl.textContent='Type or paste below'; micWrap.style.opacity='.4'; micWrap.style.pointerEvents='none';
+  }
+
+  function buildRecognition(){
+    var r=new SR(); r.continuous=true; r.interimResults=true; r.lang='en-US';
+    r.onresult=function(e){
+      interimText="";
+      for(var i=e.resultIndex;i<e.results.length;i++){
+        var t=e.results[i][0].transcript;
+        if(e.results[i].isFinal){ finalText+=(finalText&&!/\s$/.test(finalText)?" ":"")+t.trim(); }
+        else { interimText+=t; }
+      }
+      renderTranscript();
+    };
+    r.onerror=function(e){
+      if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+        stopRecording();
+        supportBanner.innerHTML='<div class="banner">Microphone access was blocked. Tap the address-bar lock icon and allow the mic, then reload — or just type/paste your transcript.</div>';
+      }
+    };
+    r.onend=function(){ if(recording){ try{r.start();}catch(_){} } };
+    return r;
+  }
+  function startRecording(){
+    if(!speechOK) return;
+    finalText=ta.value.trim(); interimText="";
+    try{ recognition=buildRecognition(); recognition.start(); }
+    catch(err){ showToast('Could not start microphone'); return; }
+    recording=true; stage.classList.add('recording'); startTime=Date.now();
+    timerEl.textContent='00:00'; hintEl.textContent='Recording… tap again to stop.';
+    timerInt=setInterval(updateTimer,250);
+  }
+  function stopRecording(){
+    recording=false; stage.classList.remove('recording'); clearInterval(timerInt);
+    if(recognition){ try{recognition.stop();}catch(_){} }
+    if(finalText.trim()){ finalText=finalText.trim(); ta.value=finalText; }
+    interimText=""; renderTranscript();
+    timerEl.textContent=ta.value.trim()?'Ready to analyze':'Tap to record';
+    hintEl.textContent=ta.value.trim()?'Edit if needed, then hit Analyze.':'Speak naturally — your words appear below in real time.';
+  }
+  function updateTimer(){
+    var s=Math.floor((Date.now()-startTime)/1000); var m=Math.floor(s/60); s=s%60;
+    timerEl.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+  function renderTranscript(){
+    ta.value=finalText+(interimText?((finalText?" ":"")+interimText):""); updateWordCount();
+  }
+  function updateWordCount(){
+    var w=ta.value.trim()?ta.value.trim().split(/\s+/).length:0;
+    wordCountEl.textContent=w+(w===1?' word':' words'); analyzeBtn.disabled=w<2;
+  }
+  micBtn.addEventListener('click',function(){ recording?stopRecording():startRecording(); });
+  ta.addEventListener('input',function(){ if(!recording){finalText=ta.value;} updateWordCount(); });
+  clearBtn.addEventListener('click',function(){
+    if(recording) stopRecording();
+    finalText="";interimText="";ta.value="";resultsEl.innerHTML="";updateWordCount();
+    timerEl.textContent='Tap to record';
+    hintEl.textContent='Speak naturally — your words appear below in real time.';
+  });
+
+  analyzeBtn.addEventListener('click',analyze);
+  function analyze(){
+    var text=ta.value.trim(); if(text.length<3) return;
+    resultsEl.innerHTML='<div class="result-card"><div class="loading"><div class="spinner"></div>Claude is reading your note…</div></div>';
+    resultsEl.scrollIntoView({behavior:'smooth',block:'start'});
+    fetch("/.netlify/functions/summarize",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({transcript:text})
+    })
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'error'); return j; }); })
+    .then(function(j){
+      var clean=(j.raw||"").replace(/```json/gi,"").replace(/```/g,"").trim();
+      var obj; try{obj=JSON.parse(clean);}catch(e){ var m=clean.match(/\{[\s\S]*\}/); if(m){try{obj=JSON.parse(m[0]);}catch(_){}} }
+      if(!obj) throw new Error("parse"); renderResult(obj,text);
+    })
+    .catch(function(err){
+      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner">Couldn\'t generate the summary ('+esc(err.message||'error')+'). Check that ANTHROPIC_API_KEY is set in Netlify, then try again.</div></div></div>';
+    });
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  function renderResult(obj,sourceText){
+    var when=new Date().toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    var title=obj.title||"Voice Note", summary=obj.summary||"";
+    var points=Array.isArray(obj.keyPoints)?obj.keyPoints:[], steps=Array.isArray(obj.nextSteps)?obj.nextSteps:[];
+    var html='<div class="result-card"><div class="rc-top"><div class="rc-title">'+esc(title)+'</div><div class="rc-when">'+esc(when)+'</div></div>';
+    if(summary) html+='<div class="section"><div class="section-label">Summary</div><div class="summary">'+esc(summary)+'</div></div>';
+    if(points.length){ html+='<div class="section"><div class="section-label">Key points</div><ul class="points">'; points.forEach(function(p){html+='<li>'+esc(p)+'</li>';}); html+='</ul></div>'; }
+    html+='<div class="section"><div class="section-label">Next steps</div>';
+    if(steps.length){
+      steps.forEach(function(s,i){
+        var pri=(s.priority||'medium').toLowerCase(); if(['high','medium','low'].indexOf(pri)<0)pri='medium';
+        html+='<div class="step" data-i="'+i+'"><div class="chk" role="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="step-body"><div class="step-text">'+esc(s.text||"")+'</div>';
+        var chips='<span class="chip pri '+pri+'">'+pri+'</span>';
+        if(s.owner) chips+='<span class="chip">@ '+esc(s.owner)+'</span>';
+        if(s.due) chips+='<span class="chip">'+esc(s.due)+'</span>';
+        html+='<div class="step-meta">'+chips+'</div></div></div>';
+      });
+    } else { html+='<div class="summary" style="color:var(--faint);font-size:14px">No action items detected in this note.</div>'; }
+    html+='</div><div class="rc-actions"><button class="btn btn-ghost" data-act="copy">Copy</button><button class="btn btn-ghost" data-act="new">New note</button></div></div>';
+    resultsEl.innerHTML=html;
+    resultsEl.querySelectorAll('.step .chk').forEach(function(c){ c.addEventListener('click',function(){ c.closest('.step').classList.toggle('done'); }); });
+    resultsEl.querySelector('[data-act="copy"]').addEventListener('click',function(){ copyResult(title,summary,points,steps); });
+    resultsEl.querySelector('[data-act="new"]').addEventListener('click',function(){ clearBtn.click(); window.scrollTo({top:0,behavior:'smooth'}); });
+    history.unshift({title:title,summary:summary,points:points,steps:steps,text:sourceText,when:when}); renderHistory();
+  }
+  function copyResult(title,summary,points,steps){
+    var out=title+"\n\nSUMMARY\n"+summary+"\n";
+    if(points.length){ out+="\nKEY POINTS\n"; points.forEach(function(p){out+="• "+p+"\n";}); }
+    out+="\nNEXT STEPS\n";
+    if(steps.length){ steps.forEach(function(s){ out+="[ ] "+s.text+(s.owner?(" — @"+s.owner):"")+(s.due?(" ("+s.due+")"):"")+" ["+(s.priority||'medium')+"]\n"; }); } else out+="(none)\n";
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(out).then(function(){showToast('Copied to clipboard');},function(){showToast('Copy failed');}); }
+    else { var t=document.createElement('textarea');t.value=out;document.body.appendChild(t);t.select(); try{document.execCommand('copy');showToast('Copied');}catch(e){showToast('Copy failed');} document.body.removeChild(t); }
+  }
+  function renderHistory(){
+    if(!history.length){ histWrap.classList.add('hidden'); return; }
+    histWrap.classList.remove('hidden'); histList.innerHTML='';
+    history.forEach(function(item){
+      var d=document.createElement('div'); d.className='hist-item';
+      d.innerHTML='<span class="hi-title">'+esc(item.title)+'</span><span class="hi-when">'+esc(item.when)+'</span>';
+      d.addEventListener('click',function(){
+        ta.value=item.text; finalText=item.text; updateWordCount();
+        renderResult({title:item.title,summary:item.summary,keyPoints:item.points,nextSteps:item.steps},item.text);
+        history.shift(); renderHistory(); resultsEl.scrollIntoView({behavior:'smooth',block:'start'});
+      });
+      histList.appendChild(d);
+    });
+  }
+  function showToast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(function(){toastEl.classList.remove('show');},1900); }
+  updateWordCount();
+});
+</script>
+</body>
+</html>
