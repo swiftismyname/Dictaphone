@@ -142,7 +142,7 @@
   </div>
   <div id="results"></div>
   <div class="hist hidden" id="histWrap"><div class="hist-label">Session history</div><div id="histList"></div></div>
-  <footer>Transcription runs in your browser. Summaries go through your Netlify function to Claude.<br>Notes are held in memory only and clear when you reload.</footer>
+  <footer>Transcription runs in your browser. Summaries go through your Netlify function to Gemini.<br>Notes are held in memory only and clear when you reload.</footer>
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function(){
   analyzeBtn.addEventListener('click',analyze);
   function analyze(){
     var text=ta.value.trim(); if(text.length<3) return;
-    resultsEl.innerHTML='<div class="result-card"><div class="loading"><div class="spinner"></div>Claude is reading your note…</div></div>';
+    resultsEl.innerHTML='<div class="result-card"><div class="loading"><div class="spinner"></div>Analyzing your note…</div></div>';
     resultsEl.scrollIntoView({behavior:'smooth',block:'start'});
     fetch("/.netlify/functions/summarize",{
       method:"POST",headers:{"Content-Type":"application/json"},
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function(){
       if(!obj) throw new Error("parse"); renderResult(obj,text);
     })
     .catch(function(err){
-      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner">Couldn\'t generate the summary ('+esc(err.message||'error')+'). Check that ANTHROPIC_API_KEY is set in Netlify, then try again.</div></div></div>';
+      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner">Couldn\'t generate the summary ('+esc(err.message||'error')+'). Check that GEMINI_API_KEY is set in Netlify, then try again.</div></div></div>';
     });
   }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
