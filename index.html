@@ -141,7 +141,7 @@
     </button>
     <input type="file" id="audioInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.aac,.flac,.aiff" hidden>
   </div>
-  <div class="upload-hint" id="uploadHint">MP3 · M4A · WAV · OGG — up to ~4 MB</div>
+  <div class="upload-hint" id="uploadHint">MP3 · M4A · WAV · OGG — up to ~100 MB (long recordings welcome)</div>
   <div id="supportBanner"></div>
   <div class="panel">
     <div class="panel-head"><h2>Transcript</h2><span class="meta" id="wordCount">0 words</span></div>
@@ -176,7 +176,9 @@ document.addEventListener('DOMContentLoaded', function(){
       supportBanner=document.getElementById('supportBanner'), histWrap=document.getElementById('histWrap'),
       histList=document.getElementById('histList'), toastEl=document.getElementById('toast'),
       uploadBtn=document.getElementById('uploadBtn'), audioInput=document.getElementById('audioInput');
-  var MAX_AUDIO_BYTES=4*1024*1024;
+  var MAX_AUDIO_BYTES=4*1024*1024;          // <= this -> fast inline path (returns full transcript)
+  var CHUNK_BYTES=3*1024*1024;              // 3 MiB per chunk (multiple of 256 KiB, fits Netlify's body cap)
+  var MAX_UPLOAD_BYTES=100*1024*1024;       // hard ceiling for the chunked File API path
 
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition, speechOK=!!SR;
   if(!speechOK){
@@ -244,10 +246,11 @@ document.addEventListener('DOMContentLoaded', function(){
   uploadBtn.addEventListener('click',function(){ audioInput.value=""; audioInput.click(); });
   audioInput.addEventListener('change',function(){
     var file=audioInput.files&&audioInput.files[0]; if(!file) return;
-    if(file.size>MAX_AUDIO_BYTES){
-      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner warn">That recording is '+(file.size/1048576).toFixed(1)+' MB. Please upload a clip under ~4 MB — compressed formats like MP3 or M4A fit far more audio per MB than WAV.</div></div></div>';
+    if(file.size>MAX_UPLOAD_BYTES){
+      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner warn">That recording is '+(file.size/1048576).toFixed(1)+' MB, over the 100 MB limit. Trim it or split it into a couple of parts.</div></div></div>';
       resultsEl.scrollIntoView({behavior:'smooth',block:'start'}); return;
     }
+    if(file.size>MAX_AUDIO_BYTES){ largeUpload(file); return; }
     if(recording) stopRecording();
     var label=file.name||'recording';
     resultsEl.innerHTML='<div class="result-card"><div class="loading"><div class="spinner"></div>Transcribing &amp; analyzing “'+esc(label)+'”…</div></div>';
@@ -293,6 +296,66 @@ document.addEventListener('DOMContentLoaded', function(){
     if(n.endsWith('.flac'))return 'audio/flac';
     if(n.endsWith('.aiff')||n.endsWith('.aif'))return 'audio/aiff';
     return 'audio/mpeg';
+  }
+
+  function upPost(payload){
+    return fetch("/.netlify/functions/upload",{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)
+    }).then(function(r){ return r.json().then(function(jj){ if(!r.ok) throw new Error(jj.error||("HTTP "+r.status)); return jj; }); });
+  }
+  function readSliceB64(blob){
+    return new Promise(function(resolve,reject){
+      var r=new FileReader();
+      r.onerror=function(){ reject(new Error("couldn't read file")); };
+      r.onload=function(){ var s=String(r.result||""); var c=s.indexOf(','); resolve(c>=0?s.slice(c+1):s); };
+      r.readAsDataURL(blob);
+    });
+  }
+  function setUpMsg(t){ var e=document.getElementById('upMsg'); if(e) e.textContent=t; }
+  function wait(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+  async function largeUpload(file){
+    if(recording) stopRecording();
+    var mime=file.type||guessMime(file.name), label=file.name||'recording';
+    resultsEl.innerHTML='<div class="result-card"><div class="loading"><div class="spinner"></div><span id="upMsg">Preparing upload…</span></div></div>';
+    resultsEl.scrollIntoView({behavior:'smooth',block:'start'});
+    timerEl.textContent='Uploading your recording…';
+    hintEl.textContent='Large file — sending it up in pieces, then transcribing with Gemini.';
+    try{
+      var started=await upPost({action:'start',size:file.size,mimeType:mime,displayName:label});
+      if(!started.uploadUrl) throw new Error("upload didn't start");
+      var offset=0, fileInfo=null;
+      while(offset<file.size){
+        var end=Math.min(offset+CHUNK_BYTES,file.size), last=end>=file.size;
+        var b64=await readSliceB64(file.slice(offset,end));
+        var res=await upPost({action:'chunk',uploadUrl:started.uploadUrl,offset:offset,last:last,data:b64});
+        offset=end;
+        setUpMsg('Uploading… '+Math.round((offset/file.size)*100)+'%');
+        if(last && res.file) fileInfo=res.file;
+      }
+      if(!fileInfo||!fileInfo.uri) throw new Error("upload didn't finalize");
+      setUpMsg('Processing the recording…');
+      var state=fileInfo.state||'PROCESSING', tries=0;
+      while(state!=='ACTIVE'){
+        if(state==='FAILED') throw new Error("Gemini couldn't process this audio");
+        if(tries++>80) throw new Error("processing timed out");
+        await wait(2500);
+        var st=await upPost({action:'status',name:fileInfo.name});
+        state=st.state||state;
+      }
+      setUpMsg('Transcribing & pulling out your next steps…');
+      timerEl.textContent='Almost there…';
+      var g=await upPost({action:'generate',fileUri:fileInfo.uri,mimeType:fileInfo.mimeType||mime});
+      var clean=(g.raw||"").replace(/```json/gi,"").replace(/```/g,"").trim();
+      var obj; try{obj=JSON.parse(clean);}catch(e){ var m=clean.match(/\{[\s\S]*\}/); if(m){try{obj=JSON.parse(m[0]);}catch(_){}} }
+      if(!obj) throw new Error("couldn't parse the summary");
+      timerEl.textContent='Done';
+      hintEl.textContent='Note ready below. Full transcript isn’t shown for large uploads — the summary and next steps are.';
+      renderResult(obj,label);
+    }catch(err){
+      resultsEl.innerHTML='<div class="result-card"><div class="section"><div class="banner">Couldn\'t finish that upload ('+esc(err.message||'error')+'). If it timed out on the final step, the recording may be long enough that transcription needs a background function — tell me and I\'ll move it there. Otherwise confirm GEMINI_API_KEY is set in Netlify and retry.</div></div></div>';
+      timerEl.textContent='Tap to record'; hintEl.textContent='Speak naturally — your words appear below in real time.';
+    }
   }
 
   analyzeBtn.addEventListener('click',analyze);
